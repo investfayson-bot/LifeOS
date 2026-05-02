@@ -2,7 +2,7 @@ import { Worker } from 'bullmq';
 import { redis } from '../lib/redis';
 import { type IncomingMessage } from './message.queue';
 import { orchestrate } from '../agents/orchestrator';
-import { sendText, sendTyping } from '../lib/evolution';
+import { sendText, sendTyping } from '../lib/zapi';
 
 export function startWorker(): void {
   const worker = new Worker<IncomingMessage>(
