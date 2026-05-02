@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: LifeOS-1
+    runtime: node
+    region: ohio
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "20"
