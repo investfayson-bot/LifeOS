@@ -1,0 +1,226 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PlanType {
+  PERSONAL
+  PROFESSIONAL
+}
+
+enum ProfessionType {
+  PERSONAL
+  REALTOR
+  DENTIST
+  AESTHETICIAN
+  PHOTOGRAPHER
+  CUSTOM
+}
+
+enum ConnectorType {
+  GOOGLE
+  BANK_OFX
+  OPEN_FINANCE
+  FACTORONE
+  VN_PRIME
+  INSTAGRAM
+  CUSTOM
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// ─── CORE ────────────────────────────────────────────────
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  users     User[]
+}
+
+model User {
+  id             String         @id @default(uuid())
+  phone          String         @unique
+  name           String?
+  plan           PlanType       @default(PERSONAL)
+  professionType ProfessionType @default(PERSONAL)
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  tokenBudget    Float          @default(10.0)
+  tokenUsed      Float          @default(0.0)
+
+  // Família
+  familyId    String?
+  inviteCode  String?  @unique
+  familyRole  String   @default("OWNER")  // OWNER | MEMBER
+
+  // Resumo diário
+  dailySummary Boolean @default(false)
+  summaryHour  Int     @default(8)
+
+  createdAt DateTime @default(now())
+
+  connectors    Connector[]
+  expenses      Expense[]
+  bills         Bill[]
+  leads         Lead[]
+  appointments  Appointment[]
+  memories      LongTermMemory[]
+  notifications NotificationSchedule[]
+  goals         FinancialGoal[]
+}
+
+// ─── CONNECTORS ──────────────────────────────────────────
+
+model Connector {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  type         ConnectorType
+  accessToken  String?
+  refreshToken String?
+  metadata     Json?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+
+  @@unique([userId, type])
+}
+
+// ─── FINANCE ─────────────────────────────────────────────
+
+model Expense {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  description String
+  amount      Float
+  type        String   @default("EXPENSE")   // EXPENSE | INCOME
+  category    String   @default("Outros")    // livre — sem enum
+  date        DateTime @default(now())
+  receiptUrl  String?
+  source      String   @default("manual")    // manual | ocr | ofx | whatsapp
+  createdAt   DateTime @default(now())
+}
+
+model Bill {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  description    String
+  amount         Float
+  dueDate        DateTime
+  paid           Boolean  @default(false)
+  recurring      Boolean  @default(false)
+  recurringDay   Int?     // dia do mês para recorrência
+  createdAt      DateTime @default(now())
+}
+
+// ─── METAS FINANCEIRAS ───────────────────────────────────
+
+model FinancialGoal {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  description  String
+  targetAmount Float
+  savedAmount  Float     @default(0)
+  deadline     DateTime?
+  achieved     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ─── CRM ─────────────────────────────────────────────────
+
+model Lead {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  name         String
+  phone        String?
+  email        String?
+  status       LeadStatus @default(NEW)
+  notes        String?
+  source       String?
+  externalId   String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  followUps    FollowUp[]
+}
+
+model FollowUp {
+  id          String    @id @default(uuid())
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id])
+  notes       String
+  scheduledAt DateTime?
+  done        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+}
+
+// ─── SCHEDULING ──────────────────────────────────────────
+
+model Appointment {
+  id           String            @id @default(uuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id])
+  clientName   String
+  clientPhone  String?
+  service      String?
+  status       AppointmentStatus @default(SCHEDULED)
+  scheduledAt  DateTime
+  durationMins Int               @default(60)
+  notes        String?
+  reminderSent Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+}
+
+// ─── MEMORY ──────────────────────────────────────────────
+
+model LongTermMemory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────
+
+model NotificationSchedule {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  sendAt    DateTime
+  sent      Boolean  @default(false)
+  recurring Boolean  @default(false)
+  cronExpr  String?
+  createdAt DateTime @default(now())
+}

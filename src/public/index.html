@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LifeOS — Dashboard</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#10b981" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="LifeOS" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    .card { @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6; }
+    .badge-new { @apply bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full; }
+    .badge-won { @apply bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full; }
+    .badge-lost { @apply bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full; }
+    .badge-contacted { @apply bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full; }
+    .badge-proposal { @apply bg-purple-100 text-purple-700 text-xs font-medium px-2 py-0.5 rounded-full; }
+    .badge-negotiation { @apply bg-orange-100 text-orange-700 text-xs font-medium px-2 py-0.5 rounded-full; }
+    .badge-qualified { @apply bg-teal-100 text-teal-700 text-xs font-medium px-2 py-0.5 rounded-full; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Sidebar -->
+  <div class="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-100 flex flex-col z-10">
+    <div class="p-6 border-b border-gray-100">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl flex items-center justify-center">
+          <span class="text-white text-sm font-bold">L</span>
+        </div>
+        <div>
+          <h1 class="font-semibold text-gray-900 text-sm">LifeOS</h1>
+          <p class="text-xs text-gray-400">Assistente WhatsApp</p>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 p-4 space-y-1">
+      <a href="#overview" onclick="showSection('overview')" class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        <span class="text-lg">📊</span> Visão Geral
+      </a>
+      <a href="#expenses" onclick="showSection('expenses')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        <span class="text-lg">💰</span> Finanças
+      </a>
+      <a href="#appointments" onclick="showSection('appointments')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        <span class="text-lg">📅</span> Agendamentos
+      </a>
+      <a href="#leads" onclick="showSection('leads')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        <span class="text-lg">👥</span> CRM / Leads
+      </a>
+    </nav>
+    <div class="p-4 border-t border-gray-100">
+      <div id="server-status" class="flex items-center gap-2 text-xs text-gray-400">
+        <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+        Servidor online
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="ml-64 p-8">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h2 class="text-2xl font-semibold text-gray-900" id="page-title">Visão Geral</h2>
+        <p class="text-sm text-gray-400 mt-0.5" id="page-subtitle">Resumo do seu assistente LifeOS</p>
+      </div>
+      <button onclick="refreshAll()" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors px-4 py-2 rounded-xl border border-gray-200 hover:border-gray-300">
+        <span>↻</span> Atualizar
+      </button>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div id="section-overview">
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-4 gap-5 mb-8">
+        <div class="card">
+          <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">Usuários</p>
+          <p class="text-3xl font-bold text-gray-900 mt-2" id="stat-users">—</p>
+          <p class="text-xs text-gray-400 mt-1">ativos no sistema</p>
+        </div>
+        <div class="card">
+          <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">Gastos no mês</p>
+          <p class="text-3xl font-bold text-emerald-600 mt-2" id="stat-expenses">—</p>
+          <p class="text-xs text-gray-400 mt-1" id="stat-expense-count">— transações</p>
+        </div>
+        <div class="card">
+          <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">Contas pendentes</p>
+          <p class="text-3xl font-bold text-orange-500 mt-2" id="stat-bills">—</p>
+          <p class="text-xs text-gray-400 mt-1">a pagar</p>
+        </div>
+        <div class="card">
+          <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">Agendamentos</p>
+          <p class="text-3xl font-bold text-blue-600 mt-2" id="stat-appointments">—</p>
+          <p class="text-xs text-gray-400 mt-1">próximos 7 dias</p>
+        </div>
+      </div>
+
+      <!-- Chart + Leads Pipeline -->
+      <div class="grid grid-cols-2 gap-5 mb-8">
+        <div class="card">
+          <h3 class="font-semibold text-gray-800 mb-4">Gastos — últimos 7 dias</h3>
+          <canvas id="expenses-chart" height="180"></canvas>
+        </div>
+        <div class="card">
+          <h3 class="font-semibold text-gray-800 mb-4">Pipeline de Leads</h3>
+          <div id="leads-pipeline" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- Recent Expenses -->
+      <div class="card">
+        <h3 class="font-semibold text-gray-800 mb-4">Últimas transações</h3>
+        <div id="recent-expenses" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- EXPENSES SECTION -->
+    <div id="section-expenses" class="hidden">
+      <div class="card">
+        <h3 class="font-semibold text-gray-800 mb-5">Todas as transações</h3>
+        <div id="all-expenses" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- APPOINTMENTS SECTION -->
+    <div id="section-appointments" class="hidden">
+      <div class="card">
+        <h3 class="font-semibold text-gray-800 mb-5">Próximos agendamentos</h3>
+        <div id="all-appointments" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- LEADS SECTION -->
+    <div id="section-leads" class="hidden">
+      <div class="card">
+        <h3 class="font-semibold text-gray-800 mb-5">Todos os leads</h3>
+        <div id="all-leads" class="space-y-3"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const categoryEmoji = { FOOD:'🍽️', TRANSPORT:'🚗', HEALTH:'🏥', EDUCATION:'📚', HOUSING:'🏠', ENTERTAINMENT:'🎬', BUSINESS:'💼', OTHER:'📦' };
+    const statusLabel = { NEW:'Novo', CONTACTED:'Contatado', QUALIFIED:'Qualificado', PROPOSAL:'Proposta', NEGOTIATION:'Negociação', WON:'Ganho', LOST:'Perdido' };
+    const statusBadge = { NEW:'badge-new', CONTACTED:'badge-contacted', QUALIFIED:'badge-qualified', PROPOSAL:'badge-proposal', NEGOTIATION:'badge-negotiation', WON:'badge-won', LOST:'badge-lost' };
+    let chartInstance = null;
+
+    function fmt(v) { return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+    function fmtDate(d) { return new Date(d).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+    function fmtDateShort(d) { return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }); }
+
+    function showSection(name) {
+      ['overview','expenses','appointments','leads'].forEach(s => {
+        document.getElementById('section-' + s).classList.toggle('hidden', s !== name);
+      });
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('bg-gray-100', 'text-gray-900'));
+      event.currentTarget.classList.add('bg-gray-100', 'text-gray-900');
+      const titles = { overview: ['Visão Geral', 'Resumo do seu assistente LifeOS'], expenses: ['Finanças', 'Histórico de transações'], appointments: ['Agendamentos', 'Próximos compromissos'], leads: ['CRM / Leads', 'Pipeline de clientes'] };
+      document.getElementById('page-title').textContent = titles[name][0];
+      document.getElementById('page-subtitle').textContent = titles[name][1];
+    }
+
+    async function loadStats() {
+      const d = await fetch('/api/stats').then(r => r.json());
+      document.getElementById('stat-users').textContent = d.users;
+      document.getElementById('stat-expenses').textContent = fmt(d.monthExpenses);
+      document.getElementById('stat-expense-count').textContent = d.expenseCount + ' transações';
+      document.getElementById('stat-bills').textContent = d.pendingBills;
+      document.getElementById('stat-appointments').textContent = d.upcomingAppointments;
+
+      const pipeline = document.getElementById('leads-pipeline');
+      const total = Object.values(d.leads).reduce((a, b) => a + b, 0) || 1;
+      const order = ['NEW','CONTACTED','QUALIFIED','PROPOSAL','NEGOTIATION','WON','LOST'];
+      const colors = { NEW:'bg-blue-400', CONTACTED:'bg-yellow-400', QUALIFIED:'bg-teal-400', PROPOSAL:'bg-purple-400', NEGOTIATION:'bg-orange-400', WON:'bg-green-400', LOST:'bg-red-400' };
+      pipeline.innerHTML = order.filter(s => d.leads[s]).map(s => `
+        <div>
+          <div class="flex justify-between text-xs text-gray-600 mb-1">
+            <span>${statusLabel[s]}</span><span class="font-medium">${d.leads[s] || 0}</span>
+          </div>
+          <div class="w-full bg-gray-100 rounded-full h-2">
+            <div class="${colors[s]} h-2 rounded-full transition-all" style="width:${Math.round((d.leads[s]||0)/total*100)}%"></div>
+          </div>
+        </div>`).join('') || '<p class="text-sm text-gray-400">Nenhum lead cadastrado</p>';
+    }
+
+    async function loadExpensesChart() {
+      const data = await fetch('/api/expenses/chart').then(r => r.json());
+      const ctx = document.getElementById('expenses-chart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => d.date),
+          datasets: [{ label: 'Gastos', data: data.map(d => d.total), backgroundColor: 'rgba(16,185,129,0.15)', borderColor: 'rgba(16,185,129,0.8)', borderWidth: 2, borderRadius: 8 }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { callback: v => 'R$' + v } }, x: { grid: { display: false } } } }
+      });
+    }
+
+    async function loadRecentExpenses() {
+      const data = await fetch('/api/expenses?limit=5').then(r => r.json());
+      const el = document.getElementById('recent-expenses');
+      const allEl = document.getElementById('all-expenses');
+      const render = (expenses) => expenses.map(e => `
+        <div class="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+          <div class="flex items-center gap-3">
+            <span class="text-xl">${categoryEmoji[e.category] || '📦'}</span>
+            <div>
+              <p class="text-sm font-medium text-gray-800">${e.description}</p>
+              <p class="text-xs text-gray-400">${fmtDateShort(e.date)} · ${e.user?.name || e.user?.phone || '—'}</p>
+            </div>
+          </div>
+          <span class="text-sm font-semibold text-gray-900">${fmt(e.amount)}</span>
+        </div>`).join('') || '<p class="text-sm text-gray-400">Nenhuma transação ainda</p>';
+      el.innerHTML = render(data);
+      const allData = await fetch('/api/expenses?limit=50').then(r => r.json());
+      allEl.innerHTML = render(allData);
+    }
+
+    async function loadAppointments() {
+      const data = await fetch('/api/appointments').then(r => r.json());
+      document.getElementById('all-appointments').innerHTML = data.map(a => `
+        <div class="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-lg">📅</div>
+            <div>
+              <p class="text-sm font-medium text-gray-800">${a.clientName}</p>
+              <p class="text-xs text-gray-400">${a.service || 'Sem serviço'} · ${a.user?.name || a.user?.phone}</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <p class="text-sm font-semibold text-blue-600">${fmtDate(a.scheduledAt)}</p>
+            <p class="text-xs text-gray-400">${a.status}</p>
+          </div>
+        </div>`).join('') || '<p class="text-sm text-gray-400">Nenhum agendamento futuro</p>';
+    }
+
+    async function loadLeads() {
+      const data = await fetch('/api/leads').then(r => r.json());
+      document.getElementById('all-leads').innerHTML = data.map(l => `
+        <div class="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center font-semibold text-purple-600 text-sm">${l.name.charAt(0)}</div>
+            <div>
+              <p class="text-sm font-medium text-gray-800">${l.name}</p>
+              <p class="text-xs text-gray-400">${l.phone || 'Sem telefone'} · ${l.user?.name || l.user?.phone}</p>
+              ${l.followUps?.[0] ? `<p class="text-xs text-orange-500 mt-0.5">📌 ${l.followUps[0].notes}</p>` : ''}
+            </div>
+          </div>
+          <span class="${statusBadge[l.status] || 'badge-new'}">${statusLabel[l.status] || l.status}</span>
+        </div>`).join('') || '<p class="text-sm text-gray-400">Nenhum lead cadastrado</p>';
+    }
+
+    async function refreshAll() {
+      await Promise.all([loadStats(), loadExpensesChart(), loadRecentExpenses(), loadAppointments(), loadLeads()]);
+    }
+
+    refreshAll();
+    setInterval(refreshAll, 30000);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
+</body>
+</html>
