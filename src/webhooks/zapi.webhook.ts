@@ -20,10 +20,18 @@ const ALLOWED_PHONES = (process.env['ALLOWED_PHONES'] ?? '')
   .map((p) => p.trim().replace(/\D/g, ''))
   .filter(Boolean);
 
+let lastWebhook: { phone: string; type: string; time: string } | null = null;
+
+zapiRouter.get('/webhook/zapi/test', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', lastWebhook, serverTime: new Date().toISOString() });
+});
+
 zapiRouter.post('/webhook/zapi', async (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
 
   const body = req.body as ZApiMessage;
+  console.log(`[Webhook] Received — phone:${body.phone} fromMe:${body.fromMe} type:${body.type}`);
+  lastWebhook = { phone: body.phone ?? 'unknown', type: body.type ?? 'unknown', time: new Date().toISOString() };
 
   if (body.fromMe) return;
   if (body.isGroupMsg) return;
