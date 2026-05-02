@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { sendText } from '../lib/zapi';
+import { sendText } from '../lib/evolution';
 import crypto from 'crypto';
 
 function generateCode(): string {
