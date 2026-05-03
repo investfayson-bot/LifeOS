@@ -6,9 +6,9 @@ async function parseDateTime(input: string): Promise<Date> {
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 64,
-    system: `Você converte expressões de data/hora em português para ISO 8601.
-Data atual: ${now.toISOString()} (fuso: America/Sao_Paulo)
-Retorne APENAS o ISO 8601, sem mais nada. Ex: 2025-05-15T14:00:00`,
+    system: `Você converte expressões de data/hora em português para ISO 8601 com fuso horário de Brasília (UTC-3).
+Data e hora atual: ${now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (America/Sao_Paulo, UTC-3)
+Retorne APENAS o ISO 8601 com offset -03:00. Ex: 2025-05-15T14:00:00-03:00`,
     messages: [{ role: 'user', content: input }],
   });
   const raw = response.content[0]?.type === 'text' ? response.content[0].text.trim() : '';

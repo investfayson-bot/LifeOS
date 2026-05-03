@@ -34,7 +34,7 @@ Agents and actions:
 - CRM: list_leads, create_lead, update_lead, add_followup, pipeline_summary
 - SCHEDULING: create_appointment, list_appointments, cancel_appointment
 - MARKETING: create_caption, create_script, create_post_idea
-- NOTIFICATION: schedule_reminder, list_reminders, cancel_reminder
+- NOTIFICATION: schedule_reminder, list_reminders, cancel_reminder, activate_summary, deactivate_summary
 - FAMILY: create_invite, join_family, list_members, leave_family
 - INFO: transit_route, driving_route, nearby, weather, forecast, currency_rate, all_rates, cep_lookup, cnpj_lookup, fipe_lookup, holidays, bank_lookup
 - GENERAL: greeting, help, unknown
@@ -43,13 +43,13 @@ INFO rules:
 - "ônibus", "metrô", "como ir de", "rota de transporte" → INFO transit_route (extract origin, destination)
 - "como chegar", "rota de carro" → INFO driving_route (extract origin, destination)
 - "restaurante perto", "farmácia perto", "hospital perto" → INFO nearby (extract location, place_type)
-- "tempo em", "clima em", "temperatura" → INFO weather (extract city)
-- "previsão do tempo", "próximos dias" → INFO forecast (extract city)
-- "cotação do dólar/euro/bitcoin" → INFO currency_rate (extract currency: USD/EUR/BTC/GBP/ARS)
-- "todas as cotações", "câmbio hoje" → INFO all_rates
+- "tempo", "clima", "temperatura", "vai chover", "chuva", "faz calor", "está frio", "calor hoje", "frio hoje", "como está o tempo", "graus" → INFO weather (extract city, default Belo Horizonte if not mentioned)
+- "previsão do tempo", "próximos dias", "semana", "vai chover amanhã" → INFO forecast (extract city, default Belo Horizonte)
+- "cotação", "dólar", "euro", "bitcoin", "libra", "quanto está o dólar", "preço do dólar", "dólar hoje", "euro hoje", "bitcoin hoje", "câmbio do" → INFO currency_rate (extract currency: USD/EUR/BTC/GBP/ARS/CAD/AUD)
+- "todas as cotações", "câmbio hoje", "cotações", "moedas hoje" → INFO all_rates
 - "CEP", "cep " followed by numbers → INFO cep_lookup (extract cep)
 - "CNPJ", "cnpj " followed by numbers → INFO cnpj_lookup (extract cnpj)
-- "tabela FIPE", "preço do carro" → INFO fipe_lookup (extract query)
+- "tabela FIPE", "preço do carro", "fipe" → INFO fipe_lookup (extract query)
 - "feriados", "próximos feriados" → INFO holidays
 - "código do banco", "banco " followed by name/number → INFO bank_lookup
 
@@ -62,6 +62,9 @@ Rules:
 - "minhas metas" → FINANCE list_goals
 - "agende", "marque", "consulta", "reunião" → SCHEDULING create_appointment
 - "me lembra", "lembrete", "avisa" → NOTIFICATION schedule_reminder
+- "ativar resumo", "quero resumo", "resumo diário", "resumo às", "me manda resumo" → NOTIFICATION activate_summary (extract hour as number, default 8)
+- "desativar resumo", "parar resumo", "não quero mais resumo" → NOTIFICATION deactivate_summary
+- "atualizar lead", "mover lead", "lead ganho", "lead perdido", "status do lead" → CRM update_lead (extract name, status: NEW/CONTACTED/QUALIFIED/PROPOSAL/NEGOTIATION/WON/LOST)
 - "novo lead", "cliente novo" → CRM create_lead
 - "legenda", "post", "caption", "reels" → MARKETING
 - "meu código", "convidar família" → FAMILY create_invite
@@ -78,6 +81,14 @@ Examples:
 "agende João próxima terça às 14h" → {"agent":"SCHEDULING","action":"create_appointment","entities":{"clientName":"João","time":"próxima terça às 14h"},"confidence":0.95}
 "entrar família ABC123" → {"agent":"FAMILY","action":"join_family","entities":{"code":"ABC123"},"confidence":0.99}
 "meu código de família" → {"agent":"FAMILY","action":"create_invite","entities":{},"confidence":0.99}
+"vai chover hoje?" → {"agent":"INFO","action":"weather","entities":{"city":"Belo Horizonte"},"confidence":0.95}
+"como está o tempo em São Paulo?" → {"agent":"INFO","action":"weather","entities":{"city":"São Paulo"},"confidence":0.97}
+"previsão para essa semana" → {"agent":"INFO","action":"forecast","entities":{"city":"Belo Horizonte"},"confidence":0.95}
+"quanto está o dólar?" → {"agent":"INFO","action":"currency_rate","entities":{"currency":"USD"},"confidence":0.97}
+"cotação do euro" → {"agent":"INFO","action":"currency_rate","entities":{"currency":"EUR"},"confidence":0.97}
+"todas as cotações hoje" → {"agent":"INFO","action":"all_rates","entities":{},"confidence":0.97}
+"ativar resumo diário às 7h" → {"agent":"NOTIFICATION","action":"activate_summary","entities":{"hour":7},"confidence":0.97}
+"desativar resumo" → {"agent":"NOTIFICATION","action":"deactivate_summary","entities":{},"confidence":0.99}
 "oi" → {"agent":"GENERAL","action":"greeting","entities":{},"confidence":1.0}`;
 
 async function classifyIntent(text: string, history: Array<{ role: string; content: string }>): Promise<Intent> {
@@ -207,19 +218,25 @@ export async function orchestrate(input: OrchestrateInput): Promise<string> {
 async function handleGeneral(text: string, history: Array<{ role: string; content: string }>, isNewUser: boolean, userName?: string | null): Promise<string> {
   const lower = text.toLowerCase();
 
-  if (isNewUser || lower === 'oi' || lower === 'olá' || lower === 'ola' || lower === 'fala' || lower === 'fala chat' || lower === 'ei' || lower === 'hey') {
-    const greeting = userName ? `Olá, ${userName}!` : 'Olá!';
-    return `${greeting} Sou o *LifeOS*, seu assistente pessoal.\n\nComo posso te chamar?`;
+  const greetings = ['oi', 'olá', 'ola', 'fala', 'fala chat', 'ei', 'hey', 'bom dia', 'boa tarde', 'boa noite', 'eai', 'e aí', 'opa'];
+  if (isNewUser || greetings.includes(lower)) {
+    if (!userName) {
+      return `Olá! Sou o *LifeOS*, seu assistente pessoal.\n\nComo posso te chamar?`;
+    }
+    return `Olá, ${userName}! Como posso ajudar?`;
   }
 
-  if (lower.includes('ajuda') || lower.includes('help') || lower.includes('o que você faz') || lower.includes('comandos')) {
-    return `O que posso fazer por você:\n\nFinanças — gastos, receitas, contas, metas\nAgenda — marcar, ver, cancelar compromissos\nLembretes — qualquer assunto, qualquer horário\nLeads / CRM — clientes, pipeline, follow-ups\nMarketing — legendas, roteiros, ideias de post\nFamília — compartilhar conta com membros\n\nÉ só falar naturalmente.`;
+  if (lower.includes('ajuda') || lower.includes('help') || lower.includes('o que você faz') || lower.includes('comandos') || lower.includes('menu')) {
+    return `O que posso fazer por você:\n\n*Finanças* — gastos, receitas, contas, metas de economia\n*Agenda* — marcar, ver, cancelar compromissos\n*Lembretes* — qualquer assunto, qualquer horário\n*CRM* — leads, pipeline, follow-ups\n*Marketing* — legendas, roteiros, ideias de post\n*Família* — conta compartilhada com código de convite\n*Clima* — temperatura e previsão de qualquer cidade\n*Câmbio* — dólar, euro, bitcoin, todas as cotações\n*Consultas* — CEP, CNPJ, tabela FIPE, feriados\n*Áudio* — mande um áudio que transcrevo e executo\n*Foto de recibo* — fotografe um recibo para registrar gasto\n\nÉ só falar naturalmente, sem precisar de comando.`;
   }
+
+  const nowBR = new Date().toLocaleString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 600,
-    system: `Você é o LifeOS, assistente pessoal via WhatsApp. Responda em português brasileiro.
+    system: `Você é o LifeOS, assistente pessoal via WhatsApp${userName ? ` do ${userName}` : ''}.
+Data e hora atual: ${nowBR} (horário de Brasília)
 
 Regras de formatação:
 - Respostas curtas e diretas. Sem introduções longas.

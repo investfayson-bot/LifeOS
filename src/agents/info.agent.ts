@@ -87,7 +87,13 @@ export async function handleInfo(
         return 'Não entendi o que você quer buscar. Tente: cotação do dólar, previsão do tempo, CEP, CNPJ, tabela FIPE ou rota de ônibus.';
     }
   } catch (err: any) {
-    console.error(`[InfoAgent] ${action} failed:`, err?.message);
+    console.error(`[InfoAgent] ${action} failed:`, err?.message ?? err);
+    const isNetwork = err?.code === 'ECONNREFUSED' || err?.code === 'ENOTFOUND' || err?.response?.status >= 500;
+    const is401 = err?.response?.status === 401;
+    const is404 = err?.response?.status === 404;
+    if (is401) return 'Chave de API inválida para este serviço. Verifique as configurações.';
+    if (is404) return 'Informação não encontrada. Verifique o dado informado e tente novamente.';
+    if (isNetwork) return 'Serviço externo fora do ar. Tente novamente em alguns minutos.';
     return 'Não consegui buscar essa informação agora. Tente novamente.';
   }
 }

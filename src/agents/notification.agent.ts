@@ -14,6 +14,10 @@ export async function handleNotification(
       return listReminders(userId);
     case 'cancel_reminder':
       return cancelReminder(userId, entities);
+    case 'activate_summary':
+      return activateSummary(userId, entities);
+    case 'deactivate_summary':
+      return deactivateSummary(userId);
     default:
       return generalNotificationChat(userId, rawText);
   }
@@ -26,9 +30,9 @@ async function parseReminderDate(entities: Record<string, unknown>, rawText: str
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 64,
-    system: `Converta expressão de data/hora em português para ISO 8601.
-Data atual: ${now.toISOString()} (fuso: America/Sao_Paulo)
-Se não houver horário específico, use 09:00. Retorne APENAS o ISO 8601.`,
+    system: `Converta expressão de data/hora em português para ISO 8601 com fuso de Brasília (UTC-3).
+Data e hora atual: ${now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (America/Sao_Paulo)
+Se não houver horário específico, use 09:00. Retorne APENAS o ISO 8601 com offset -03:00. Ex: 2026-05-15T09:00:00-03:00`,
     messages: [{ role: 'user', content: timeHint }],
   });
 
@@ -89,6 +93,26 @@ async function cancelReminder(userId: string, entities: Record<string, unknown>)
   await prisma.notificationSchedule.delete({ where: { id: reminder.id } });
 
   return `✅ Lembrete cancelado: ${reminder.message}`;
+}
+
+async function activateSummary(userId: string, entities: Record<string, unknown>): Promise<string> {
+  const hour = entities['hour'] !== undefined ? Number(entities['hour']) : 8;
+  const validHour = Math.max(0, Math.min(23, hour));
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { dailySummary: true, summaryHour: validHour },
+  });
+
+  return `✅ *Resumo diário ativado!*\nVou te mandar um resumo todos os dias às ${String(validHour).padStart(2, '0')}h com agenda, gastos e lembretes do dia.\n\nPara desativar: "desativar resumo diário"`;
+}
+
+async function deactivateSummary(userId: string): Promise<string> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { dailySummary: false },
+  });
+  return '✅ Resumo diário desativado.';
 }
 
 async function generalNotificationChat(userId: string, text: string): Promise<string> {
