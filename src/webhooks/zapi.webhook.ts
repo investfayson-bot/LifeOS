@@ -31,6 +31,7 @@ zapiRouter.post('/webhook/zapi', async (req: Request, res: Response) => {
 
   const body = req.body as ZApiMessage;
   console.log(`[Webhook] Received — phone:${body.phone} fromMe:${body.fromMe} type:${body.type}`);
+  console.log(`[Webhook] Body: ${JSON.stringify(body)}`);
   lastWebhook = { phone: body.phone ?? 'unknown', type: body.type ?? 'unknown', time: new Date().toISOString() };
 
   if (body.fromMe) return;
