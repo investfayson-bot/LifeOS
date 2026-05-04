@@ -91,6 +91,50 @@ Examples:
 "desativar resumo" → {"agent":"NOTIFICATION","action":"deactivate_summary","entities":{},"confidence":0.99}
 "oi" → {"agent":"GENERAL","action":"greeting","entities":{},"confidence":1.0}`;
 
+function preClassify(text: string): Intent | null {
+  const t = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  // ── Câmbio ──────────────────────────────────────────────────
+  if (/\b(dolar|dollar|usd)\b/.test(t)) return { agent: 'INFO', action: 'currency_rate', entities: { currency: 'USD' }, confidence: 1 };
+  if (/\b(euro|eur)\b/.test(t)) return { agent: 'INFO', action: 'currency_rate', entities: { currency: 'EUR' }, confidence: 1 };
+  if (/\b(bitcoin|btc)\b/.test(t)) return { agent: 'INFO', action: 'currency_rate', entities: { currency: 'BTC' }, confidence: 1 };
+  if (/\b(libra|gbp)\b/.test(t)) return { agent: 'INFO', action: 'currency_rate', entities: { currency: 'GBP' }, confidence: 1 };
+  if (/cotac[ao]|cambio|moeda[s]? hoje/.test(t)) return { agent: 'INFO', action: 'all_rates', entities: {}, confidence: 1 };
+
+  // ── Clima ────────────────────────────────────────────────────
+  const weatherMatch = t.match(/(?:tempo|clima|temperatura|chuva|vai chover|chover|calor|frio|graus)[^a-z]*(?:em|de|n[ao])?\s+([a-z\s]{3,25})?/);
+  const forecastMatch = t.match(/previsao|proximos dias|semana|amanha vai/);
+  if (forecastMatch) {
+    const cityM = t.match(/(?:em|de|n[ao])\s+([a-z\s]{3,20})/);
+    return { agent: 'INFO', action: 'forecast', entities: { city: cityM?.[1]?.trim() ?? 'Belo Horizonte' }, confidence: 1 };
+  }
+  if (weatherMatch || /\b(tempo|clima|temperatura|chuva|chover|calor hoje|frio hoje)\b/.test(t)) {
+    const cityM = t.match(/(?:em|de|n[ao])\s+([a-z\s]{3,20})/);
+    return { agent: 'INFO', action: 'weather', entities: { city: cityM?.[1]?.trim() ?? 'Belo Horizonte' }, confidence: 1 };
+  }
+
+  // ── CEP / CNPJ ───────────────────────────────────────────────
+  if (/\bcep\b|\bcep\s*\d/.test(t)) {
+    const cep = text.replace(/\D/g, '').slice(0, 8);
+    return { agent: 'INFO', action: 'cep_lookup', entities: { cep }, confidence: 1 };
+  }
+  if (/\bcnpj\b/.test(t)) {
+    const cnpj = text.replace(/\D/g, '').slice(0, 14);
+    return { agent: 'INFO', action: 'cnpj_lookup', entities: { cnpj }, confidence: 1 };
+  }
+
+  // ── Resumo diário ────────────────────────────────────────────
+  if (/ativar resumo|quero resumo|resumo diario|me manda resumo/.test(t)) {
+    const hourM = t.match(/(\d{1,2})\s*h/);
+    return { agent: 'NOTIFICATION', action: 'activate_summary', entities: { hour: hourM ? Number(hourM[1]) : 8 }, confidence: 1 };
+  }
+  if (/desativar resumo|parar resumo|nao quero.* resumo/.test(t)) {
+    return { agent: 'NOTIFICATION', action: 'deactivate_summary', entities: {}, confidence: 1 };
+  }
+
+  return null;
+}
+
 async function classifyIntent(text: string, history: Array<{ role: string; content: string }>): Promise<Intent> {
   const response = await anthropic.messages.create({
     model: MODEL,
@@ -180,7 +224,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<string> {
     }
   }
 
-  const intent = await classifyIntent(text, history);
+  const intent = preClassify(text) ?? await classifyIntent(text, history);
 
   let response: string;
 
